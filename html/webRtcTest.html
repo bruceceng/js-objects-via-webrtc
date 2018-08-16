@@ -1,0 +1,287 @@
+<html>
+  <head>
+    <script src="bip39.js"></script>
+    <script src="webrtc-adapter-latest.js"></script> <!-- https://webrtc.github.io/adapter/adapter-latest.js -->
+    <script src="bson.js"></script>
+    <script src="testTags.js"></script>
+    <script src="js-object-via-webrtc.js"></script>
+    <script>
+<!--
+
+
+
+//webRTC stuff
+
+//webRTC connection.
+
+
+// var webRtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+
+// var webRtcDc = null, webRtcSc = null, webRtcPc = new RTCPeerConnection(webRtcConfig), webRtcLive = false;
+// //webRtcPc.onaddstream = e => v2.srcObject = e.stream;
+// webRtcPc.ondatachannel = e => webRtcDc? webRtcScInit(webRtcSc = e.channel) : webRtcDcInit(webRtcDc = e.channel);
+// //v2.onloadedmetadata = e => { log("Face time!"); };
+
+// // function addTrack() {
+  // // navigator.mediaDevices.getUserMedia({video:true, audio:true})
+  // // .then(stream => pc.addStream(v1.srcObject = stream));
+// // }
+
+function connectionListCallback(connectionList)
+{
+  var outputHTML = ""
+  for (i = 0; i<connectionList.length; i++) {
+    var connection = connectionList[i];
+    //only list engines
+    if (connection != window.uniqueClientName) {
+      outputHTML += "<input type='button' onclick=\"connectionStart('" + connection + "','" + window.uniqueClientName + "')\" value='" + connection + "'/><br/>";
+    }
+    //document.getElementById("engineList").innerText = xhttp.responseText;
+  }
+  //console.log(outputHTML);
+  document.getElementById("engineList").innerHTML = outputHTML;
+}
+
+var globalMessageQueue = {};
+var globalSendBuffer = {}; //this is the global buffer object that we will try to send.
+
+
+function testObjectFunctions() {
+  var testObj = testTags; //{name: "bruce", value: 123.4567, isCool: true, testArray: [1.7,1.8,[6,7,8]], firstLevel: true};
+
+  //create a template which can encode/decode an object of the same form as testObj into a rawObject (values only, no struture or names)
+  var template1 = createTemplateFromObject(testObj);
+
+  //create a special rawObject from the template. This will later be reconstructed
+  var rawTemplate1 = serializeTemplate(template1,{encodeValues:true});
+
+  //convert the RawObject into an ArrayBuffer
+  var arrayBuffer1 = packRawObject(rawTemplate1);
+
+  //split the ArrayBuffer into chunks and assign a message number.
+  var messageNumber = 99999; //just a unique number for this message
+  splitBuffer(arrayBuffer1, messageNumber);
+
+  debugger;
+  //unsplit the buffer.
+  reassembleBuffer(arrayBuffer1);
+
+  //unpack the ArrayBuffer back into a RawObject
+  var rawTemplateReconstructed1 = unpackRawObject(arrayBuffer1);
+
+  var templateReconstructed1 = deserializeTemplate(rawTemplateReconstructed1);
+
+  var testObjReconstructed = templateReconstructed1.decodeFunction(templateReconstructed1.typeValues);
+  // //now see if we can create a raw object
+  // var rawObject1 = template1.encodeFunction(testObj);
+
+  // testObj.name = "Alex";
+  // var rawObject2 = template1.encodeFunction(testObj);
+
+  // var jsObject0 = template1.buildFunction();
+  // var jsObject1 = template1.decodeFunction(rawObject1,jsObject0);
+  // var jsObject2 = template1.decodeFunction(rawObject2);
+
+  // var template2 = createTemplateFromObject(testTags);
+  // var rawObjectBig = template2.encodeFunction(testTags);
+  debugger;
+  return;
+}
+
+    
+function start() {
+
+  //  //packData(testObj);
+  //  var t0 = performance.now();
+  //  
+  //  var result1 = packData(testTags);
+  //  var tagsPacked = packAllValues(result1);
+  //  var tagsRestored = unpackAllValues(tagsPacked);
+  //
+  //  var generateStructure = result1.buildObjectsText;
+  //  var unpackFunctions = result1.autoFunctionsText;
+  //  
+  //  var dataToSend = {"type":"unpack","template":"object1"};
+  //
+  //  dataToSend["structureCount"] = generateStructure.length;
+  //  for (var i=0; i<generateStructure.length; i++) {
+  //    dataToSend["structure_" + i] = generateStructure[i];
+  //  }
+  //
+  //  dataToSend["unpackFunctionCount"] = unpackFunctions.length;  
+  //  for (var i=0; i<unpackFunctions.length; i++) {
+  //    dataToSend["function_" + i] = unpackFunctions[i];
+  //  }
+  //  //,"index":0,"json": JSON.stringify(unpackFunctions)};
+  //  
+  //  var result = packData(dataToSend);
+  //  
+  //  //console.log("JSON length:", JSON.stringify(testTags).length);
+  //  
+  //  var t1 = performance.now();
+  //  
+  //  console.log("everything before: ", t1-t0);
+  //  
+  //  globalSendBuffer = packAllValues(result);
+  //  var t2 = performance.now();
+  //  
+  //  console.log("pack all: ", t2-t1);
+  //  
+  //  var restored = unpackAllValues(globalSendBuffer);
+  //  
+  //  var t3 = performance.now();
+  //  
+  //  console.log("unpackAllValues: ", t3-t2);
+  //  
+  //  var test1 = createParser(restored);
+  //  
+  //  var t4 = performance.now();
+  //  
+  //  console.log("createParser: ", t4-t3);
+  //  
+  //  debugger;
+
+  var testObj = testTags; //{name: "bruce", value: 123.4567, isCool: true, testArray: [1.7,1.8,[6,7,8]], firstLevel: true};
+
+  //create a template which can encode/decode an object of the same form as testObj into a rawObject (values only, no struture or names)
+  var template1 = createTemplateFromObject(testObj);
+
+  //create a special rawObject from the template. This will later be reconstructed
+  var rawTemplate1 = serializeTemplate(template1,{encodeValues:true});
+
+  //convert the RawObject into an ArrayBuffer
+  globalSendBuffer = packRawObject(rawTemplate1);
+
+  //split the ArrayBuffer into chunks and assign a message number.
+  var messageNumber = 99999; //just a unique number for this message
+  splitBuffer(globalSendBuffer, messageNumber);
+
+  
+  //var root = {};
+  //test1.generateFunction(root);
+  //test1.unpackFunction(root,tagsRestored.strings,tagsRestored.numbers,tagsRestored.booleans,[]);
+  //test1(root, restored.strings, restored.numbers, restored.booleans, []);
+  
+  //debugger;  
+  // var test1 = makeTestBuffer();
+
+  //var messageNumber = 99999; //just a unique number for this message
+  // splitBuffer(test1.buffer, messageNumber, 32);
+  // console.log(test1.buffer.length);
+  // var bufferArray = new Int32Array(test1.buffer, 0, Math.floor(test1.buffer.byteLength/4)); 
+  
+  // debugger;  
+  
+  // reassembleBuffer(test1.buffer);
+  // debugger;
+  // return;
+  
+  //split the buffer into sendable chunks.
+  //splitBuffer(globalSendBuffer, messageNumber);
+  //return;
+  
+  //reassembleBuffer(globalSendBuffer);
+  //return;
+  
+  window.uniqueClientName = makeUniqueName();
+  setThisPeersName(window.uniqueClientName);
+  
+  globalMessageQueue = createMessageQueue(
+    function(arrayBuffer1) {
+      console.log("received: ", arrayBuffer1);
+
+      //lets try and make a template.
+      var rawTemplateReconstructed1 = unpackRawObject(arrayBuffer1);
+      var templateReconstructed1 = deserializeTemplate(rawTemplateReconstructed1);
+      var testObjReconstructed = templateReconstructed1.decodeFunction(templateReconstructed1.typeValues);
+      debugger;
+    }
+  );
+
+	setReceiveMessageCallback(globalMessageQueue.receiveMessage);
+	
+  document.getElementById("clientNameDiv").innerHTML = window.uniqueClientName;
+  //get a list of servers that we can connect to
+  
+  window.setInterval(function() {
+    checkForRtcMessage();
+  }, 2000); //every couple of seconds check and see if anyone has sent messages the slow way (through Node.js server). This will be used to set up a fast, direct,
+  
+  //get list of possible clients
+  getRtcConnectionList(connectionListCallback);
+  
+  //update list every few seconds.
+  window.setInterval(function() {
+    getRtcConnectionList(connectionListCallback);
+  },5000);
+}
+
+function leave() {
+  connectionEnd();
+}
+
+function broadcastMessageClick() {
+	var message = document.getElementById("broadcastMessageInput").value;
+	broadcastMessage(message);
+}
+
+//triggered by clicking "Send Buffer"
+function sendBufferClick() {
+  var destinationClient = "";
+  for (var clientName in webRtcClients) {  
+    //lets just send to first client
+    destinationClient = clientName;
+    break;
+  }
+  console.log("Destination:", destinationClient);
+  
+  //try to set up some callbacks to send more data when buffer runs out
+  
+  //webRtcClients[destinationClient].webRtcDc.bufferedAmountLowThreshold = 500;
+  var maxChunkSize = 1024*16;
+  var chunkCount = Math.ceil(globalSendBuffer.byteLength / maxChunkSize); 
+  var currentChunk = 0;
+  var sendData = function() {
+    for (var i=currentChunk; i<chunkCount; i++) {
+      console.log("Sending chunk " + (i+1) + " of " + chunkCount);
+      webRtcClients[destinationClient].webRtcDc.send(getBufferChunk(globalSendBuffer,i));
+      currentChunk++;
+      if (webRtcClients[destinationClient].webRtcDc.bufferedAmount > 0) {break;}
+    }
+  };
+  
+  webRtcClients[destinationClient].webRtcDc.onbufferedamountlow = function() {
+    sendData();
+  }
+  
+  
+  
+  //for some reason, chrome instantly sends the first few messages without updating the bufferedAmount so onbufferedamountlow never triggers.
+  //therefore we need to send as much as possible until the buffer is used.
+  console.log("Sending first chunk",performance.now());
+  
+  //var test1 = makeTestBuffer();
+  //webRtcClients[destinationClient].webRtcDc.send(test1.bufferArray);
+  
+  //console.log(test1.bufferArray);
+  //console.log(getBufferChunk(globalSendBuffer,0));
+  
+  sendData();
+  //webRtcClients[destinationClient].webRtcDc.send(getBufferChunk(globalSendBuffer,0));
+   
+   
+  
+	//console.log("data channel:", webRtcClients[destinationClient].webRtcDc.bufferedAmount, webRtcClients[destinationClient].webRtcDc);
+}
+
+-->
+    </script>
+  </head>
+  <body onload="start()" onbeforeunload="leave()">
+    <div id="clientNameDiv"></div>
+    <div id="engineList"></div>
+		<div id="lastMessage"></div>
+		<input id="broadcastMessageInput" type = "text"/><input type="button" value="Broadcast" onclick="broadcastMessageClick()">
+    <input type="button" value="Send Buffer" onclick="sendBufferClick()">
+  </body>
+</html>
